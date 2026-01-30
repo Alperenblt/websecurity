@@ -4,6 +4,7 @@ import com.alperen.websecurity.model.User;
 import com.alperen.websecurity.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 @Service
 public class UserService {
     private final UserRepository userRepository;
@@ -15,19 +16,24 @@ public class UserService {
     }
 
     public User createUser(String username, String email, String rawPassword) {
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new IllegalArgumentException("Email already exists");
+        if (username == null || username.length() < 3) {
+            throw new IllegalArgumentException("Username must be at least 3 characters long");
+        }
+        if (!username.matches("^[a-zA-Z0-9]+$")) {
+            throw new IllegalArgumentException("Username must contain only alphanumeric characters");
+        }
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new IllegalArgumentException("Username already exists");
         }
 
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
-        User user = new User(username, email, encodedPassword);
-        return userRepository.save(user);
-    }
+        User user = new User();
+        user.setUsername(username);
+        user.setEmail(email);
+        user.setPassword(encodedPassword);
+        user.setRole("ROLE_USER");
 
-    public boolean authenticate(String email, String rawPassword) {
-        return userRepository.findByEmail(email)
-                .map(user -> passwordEncoder.matches(rawPassword, user.getPassword()))
-                .orElse(false);
+        return userRepository.save(user);
     }
 }

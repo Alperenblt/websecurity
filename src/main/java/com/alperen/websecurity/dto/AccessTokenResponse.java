@@ -1,10 +1,10 @@
 package com.alperen.websecurity.dto;
 
-public class LoginResponse {
+public class AccessTokenResponse {
     private String accessToken;
     private String tokenType;
 
-    public LoginResponse(String accessToken) {
+    public AccessTokenResponse(String accessToken) {
         this.accessToken = accessToken;
         this.tokenType = "Bearer";
     }

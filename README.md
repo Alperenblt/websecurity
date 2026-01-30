@@ -1,119 +1,118 @@
 # Web Security Application – Lab 11
 
-This project is developed for the course  
-**Security of Web Applications L2 [W.SIE.IN.5020]**.
+This project is developed for the course **Security of Web Applications L2 [W.SIE.IN.5020]**.
+The goal of Lab 11 is to integrate Spring Security and implement robust security mechanisms for a modern web application.
 
-The goal of **Lab 11** is to integrate **Spring Security** and implement both:
+The application demonstrates **session-based authentication**, **JWT (JSON Web Token) authentication**, **CSRF protection**, **Rate Limiting**, and **Role-Based Access Control (RBAC)** using Spring Boot 3 and Spring Security 6.
 
-- **Part A:** Session-based authentication (MVC track)
-- **Part B:** Token-based authentication using JWT (REST track)
+## Features
 
-The application demonstrates user registration, login, role-based authorization,
-and protected endpoints using modern Spring Security practices.
+### Authentication & Authorization
+- **JWT Authentication**: Stateless authentication using Access Tokens (short-lived) and Refresh Tokens (long-lived, rotated).
+- **Refresh Token Rotation**: Securely rotates refresh tokens on reuse to prevent token theft.
+- **Role-Based Access Control (RBAC)**:
+  - `ROLE_USER`: Can access personal notes and profile.
+  - `ROLE_ADMIN`: Can access administrative endpoints (`/admin/**`).
+- **Secure Password Storage**: Uses BCrypt with strong work factors.
 
----
+### Security Mechanisms
+- **CSRF Protection**: Cookie-based CSRF protection (`XSRF-TOKEN`) integrated with the frontend.
+- **Rate Limiting**: Implements Bucket4j to prevent abuse (Brute Force/DDoS protection) on sensitive endpoints.
+- **Input Validation**: Comprehensive DTO validation (`@Valid`, `@NotBlank`, `@Size`, etc.) and custom validators (e.g., `@UniqueUsername`).
+- **Secure Headers**:
+  - `Content-Security-Policy` (CSP)
+  - `X-Frame-Options` (DENY)
+  - `X-Content-Type-Options` (nosniff)
+- **SQL Injection Prevention**: Demonstrates safe SQL queries using `JdbcTemplate` with prepared statements.
+
+### Frontend
+- **Simple Dashboard**: A clean, responsive HTML/JS dashboard to demonstrate the security features.
+- **Secure API Integration**: JavaScript fetch API wrapper to handle JWTs and CSRF tokens automatically.
 
 ## Technologies Used
 
-- Java (JDK 17 / 23)
-- Spring Boot
-- Spring Web
-- Spring Security
-- Spring Data JPA
-- Flyway Migration
-- SQLite
-- JWT (io.jsonwebtoken – jjwt)
-- Maven
-- Git & GitHub
-
----
+- **Java 17+**
+- **Spring Boot 3.x**
+- **Spring Security 6**
+- **Spring Data JPA** & **SQLite**
+- **Flyway** (Database Migration)
+- **Bucket4j** (Rate Limiting)
+- **JJWT** (JWT Library)
+- **Maven**
 
 ## Project Structure
 
-The project follows a layered architecture:
+```
+src/main/java/com/alperen/websecurity
+├── config       # Security & Web configuration (SecurityConfig, WebConfig)
+├── controller   # REST & MVC Controllers (AuthController, NoteController)
+├── dto          # Data Transfer Objects (Requests/Responses)
+├── filter       # Security Filters (JwtAuthFilter, CsrfCookieFilter, RateLimitFilter)
+├── model        # JPA Entities (User, Note, RefreshToken)
+├── repository   # Data Access Layer
+├── security     # Security Utilities (JwtService, UserDetailsService)
+├── service      # Business Logic
+└── validation   # Custom Validators
+```
 
-- `controller` – REST and MVC controllers
-- `service` – business logic (authentication, JWT)
-- `repository` – database access layer
-- `model` – entity classes
-- `config` – Spring Security configuration
-- `security` – JWT filter and security-related classes
+## Quick Start
 
----
+### Prerequisites
+- Java 17 or higher
+- Maven
 
-## Part A – Session-based Authentication (MVC)
+### Running the Application
 
-The following features are implemented:
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/Alperenblt/websecurity.git
+    cd websecurity
+    ```
 
-1. **Custom UserDetailsService**
-    - Loads users from the database for authentication.
+2.  **Build and Run:**
+    ```bash
+    ./mvnw spring-boot:run
+    ```
+    The application will start on `http://localhost:8080`.
 
-2. **SecurityFilterChain Configuration**
-    - All pages require authentication except:
-        - `/login`
-        - `/register`
+3.  **Access the Dashboard:**
+    Open your browser and navigate to [http://localhost:8080](http://localhost:8080).
 
-3. **Login & Logout**
-    - Handled by Spring Security using HTTP sessions.
+### Default Users (Seeded via Flyway)
 
-4. **CSRF Protection**
-    - Enabled for form-based authentication (mandatory).
+| Role | Username | Password |
+| :--- | :--- | :--- |
+| **Admin** | `admin` | `password` |
+| **User** | `user` | `password` |
 
-5. **Role-based Authorization**
-    - `/admin/**` → `ROLE_ADMIN`
-    - `/user/**` → `ROLE_USER`
-
-This part demonstrates classic **session-based authentication** for MVC applications.
-
----
-
-## Part B – Token-based Authentication (JWT / REST)
-
-The following features are implemented:
-
-1. **JWT Login Endpoint**
-    - `POST /auth/login`
-    - Returns a signed JWT on successful authentication.
-
-2. **JWT Transport**
-    - JWT is sent using:
-        - `Authorization: Bearer <token>` header.
-
-3. **JwtAuthFilter**
-    - Intercepts requests.
-    - Validates JWT.
-    - Sets authentication in `SecurityContextHolder`.
-
-4. **Method-level Authorization**
-    - Uses `@PreAuthorize` annotations.
-    - Example:
-        - `@PreAuthorize("hasRole('USER')")`
-        - `@PreAuthorize("hasRole('ADMIN')")`
-
-5. **Authenticated User Access**
-    - `SecurityContextHolder` is used to identify the authenticated user
-      inside controllers.
-
-This part demonstrates **stateless, token-based authentication** suitable for REST APIs.
-
----
-
-## Example Endpoints
+## API Endpoints
 
 ### Authentication
-- `POST /auth/login` → returns JWT
+- `POST /auth/register` - Register a new user.
+- `POST /auth/login` - Login to receive Access Token & HttpOnly Refresh Cookie.
+- `POST /auth/refresh` - Rotate Refresh Token and get new Access Token.
+- `POST /auth/logout` - Secure logout (clears cookies and revokes tokens).
 
-### Protected Endpoints
-- `GET /user` → requires `ROLE_USER`
-- `GET /admin` → requires `ROLE_ADMIN`
+### Notes (Protected)
+- `GET /api/notes` - List user's notes.
+- `POST /api/notes` - Create a new note.
+- `GET /api/notes/{id}` - Get a specific note.
+- `DELETE /api/notes/{id}` - Delete a note.
 
----
+### Admin
+- `GET /admin/test` - Test admin access.
 
-## Environment Configuration
+## Configuration
 
-Sensitive configuration values are stored in a `.env` file, which is **not committed to Git**.
+Sensitive configuration is managed via `application.properties` or environment variables.
 
-### `.env.example`
 ```properties
-DB_URL=jdbc:sqlite:database.db
-JWT_SECRET=your-secret-key
+# JWT Configuration
+security.jwt.secret=YOUR_SECURE_SECRET_KEY
+security.jwt.access.expiration-seconds=3600
+security.jwt.refresh.expiration-seconds=604800
+```
+
+## License
+
+This project is open-source and available under the MIT License.

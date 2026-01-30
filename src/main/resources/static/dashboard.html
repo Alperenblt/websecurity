@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Security Lab</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 1rem; margin-bottom: 2rem; }
+        .note { border: 1px solid #ddd; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
+        .note h3 { margin-top: 0; }
+        button.logout { background: #dc3545; color: white; border: none; padding: 0.5rem 1rem; cursor: pointer; }
+        button.create { background: #28a745; color: white; border: none; padding: 0.5rem 1rem; cursor: pointer; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; }
+        input, textarea { width: 100%; padding: 0.5rem; }
+        .section { margin-bottom: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 id="greeting">Hello!</h2>
+        <button class="logout" onclick="logout()">Logout</button>
+    </div>
+
+    <div class="section">
+        <h3>Create New Note</h3>
+        <form id="createNoteForm">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="noteTitle" required>
+            </div>
+            <div class="form-group">
+                <label>Content</label>
+                <textarea id="noteContent" rows="3" required></textarea>
+            </div>
+            <button type="submit" class="create">Save Note</button>
+        </form>
+    </div>
+
+    <div class="section">
+        <h3>My Notes</h3>
+        <div id="notesList">Loading...</div>
+    </div>
+
+    <div class="section">
+        <h3>Role Demo</h3>
+        <button id="adminTestBtn" class="create">Test Admin Access</button>
+        <div id="adminStatus" style="margin-top:0.5rem;"></div>
+    </div>
+
+    <script>
+        function getCsrfToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'XSRF-TOKEN') {
+                    return decodeURIComponent(value);
+                }
+            }
+            return '';
+        }
+
+        // Check authentication by fetching user info or notes
+        async function checkAuthAndLoad() {
+            try {
+                // Try to fetch notes (protected endpoint)
+                const response = await fetch('/api/notes');
+                
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/login';
+                    return;
+                }
+
+                if (response.ok) {
+                    const notes = await response.json();
+                    renderNotes(notes);
+                    
+                    // Optional: Fetch user info if available
+                    fetchUserInfo();
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function fetchUserInfo() {
+             try {
+                const response = await fetch('/user');
+                if (response.ok) {
+                    const text = await response.text();
+                    // text is "Hello USER: email"
+                    const parts = text.split(': ');
+                    if (parts.length > 1) {
+                        document.getElementById('greeting').textContent = `Hello, ${parts[1]}!`;
+                    }
+                }
+             } catch (e) {
+                 console.log("Could not fetch user info");
+             }
+        }
+
+        function renderNotes(notes) {
+            const list = document.getElementById('notesList');
+            list.innerHTML = '';
+            if (notes.length === 0) {
+                list.innerHTML = '<p>No notes found.</p>';
+            }
+            notes.forEach(note => {
+                const div = document.createElement('div');
+                div.className = 'note';
+                div.innerHTML = `<h3>${escapeHtml(note.title)}</h3><p>${escapeHtml(note.content)}</p>`;
+                list.appendChild(div);
+            });
+        }
+
+        async function createNote(e) {
+            e.preventDefault();
+            const title = document.getElementById('noteTitle').value;
+            const content = document.getElementById('noteContent').value;
+
+            try {
+                const response = await fetch('/api/notes', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-XSRF-TOKEN': getCsrfToken()
+                    },
+                    body: JSON.stringify({ title, content })
+                });
+
+                if (response.ok) {
+                    document.getElementById('createNoteForm').reset();
+                    checkAuthAndLoad(); // Reload list
+                } else {
+                    alert('Failed to create note');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        document.getElementById('createNoteForm').addEventListener('submit', createNote);
+        document.getElementById('adminTestBtn').addEventListener('click', testAdminAccess);
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function logout() {
+            fetch('/auth/logout', { 
+                method: 'POST',
+                headers: { 'X-XSRF-TOKEN': getCsrfToken() }
+            })
+                .then(() => window.location.href = '/login');
+        }
+
+        async function testAdminAccess() {
+            const status = document.getElementById('adminStatus');
+            status.textContent = '';
+            status.style.color = '';
+            try {
+                const res = await fetch('/admin/test');
+                if (res.status === 403) {
+                    status.textContent = 'Access Denied: You do not have admin rights.';
+                    status.style.color = 'red';
+                } else if (res.ok) {
+                    status.textContent = 'Admin access OK.';
+                    status.style.color = 'green';
+                } else if (res.status === 401) {
+                    window.location.href = '/login';
+                } else {
+                    status.textContent = 'Unexpected response: ' + res.status;
+                    status.style.color = 'orange';
+                }
+            } catch (e) {
+                status.textContent = 'Error testing admin access.';
+                status.style.color = 'red';
+            }
+        }
+
+        // Initialize
+        checkAuthAndLoad();
+    </script>
+</body>
+</html>
